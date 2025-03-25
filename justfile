@@ -5,6 +5,7 @@ set shell:= ["pwsh.exe", "-c"]
 
 PROJECT_NAME:= "python_articles"
 REMOTE_REPO := "git@github.com:actuaristai/python_articles.git"
+PYTHONVERSION := "3.11.5"
 
 
 POWERSHELL_SHEBANG := if os() == 'windows' {
