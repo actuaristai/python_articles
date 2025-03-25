@@ -6,7 +6,7 @@ date-modified: last-modified
 format: 
   html:
     number-sections: true
-jupyter: python_articles # uv run python -m ipykernel install --user --name python_articles
+# jupyter: python_articles # uv run python -m ipykernel install --user --name python_articles
 echo: false
 execute:
   freeze: auto  # re-render only when source changes
