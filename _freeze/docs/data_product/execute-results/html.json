@@ -1,0 +1,12 @@
+{
+  "hash": "c6dea1f83f018bd98caa1adb1cc2a51d",
+  "result": {
+    "engine": "jupyter",
+    "markdown": "---\ntitle: \"Repository for...\"\nformat: \n    html:\n        number-sections: true\n        html-table-processing: none\njupyter: python_articles # uv run python -m ipykernel install --user --name python_articles\necho: false\nexecute:\n  freeze: auto  # re-render only when source changes\n---\n\n\n# Executive Summary\n\nThis document summarises the python_articles ...\n\nRepository for publishing useful articles on python and data science\n\n## Key info\n\n-   Repository name: python_articles\n-   Author: Actuarist AI\n-   Repository location: git@github.com:actuaristai/python_articles.git\n\n",
+    "supporting": [
+      "data_product_files"
+    ],
+    "filters": [],
+    "includes": {}
+  }
+}
