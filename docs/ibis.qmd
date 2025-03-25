@@ -1,0 +1,624 @@
+---
+title: "Revolutionizing Data Manipulation in Python: Standardization, Scalability, and Speed"
+abstract: "In this article, the author navigates the landscape of data manipulation in Python, highlighting the challenges of pandas and the potential of using Ibis to leverage powerful backends like duckdb, polars and SQL databases. Using real-world examples, Lee showcases how Ibis overcomes memory issues with larger datasets, something that will resonate with anyone who has grappled with the limitations of pandas. Beginners to Python can fast-track their learning by leveraging the latest packages, while regular pandas users can explore the exciting possibilities that Ibis presents. Even SQL users considering a switch to Python will find the transition smoother with Ibis' standardized API and simplified syntax. R users will find a closer connection with familiar dplyr verbs and standards. This article is an essential read for those eager to enhance their data analytics skills and embrace the future of Python data manipulation."
+author: "William Lee"
+date: "5/15/2023"
+date-modified: last-modified
+format: 
+  html:
+    number-sections: true
+    echo: true
+    toc: true
+---
+
+# Introduction
+Every language has different dialects / accents. With programming languages, this is no different. In R, you have the tidyverse camp and the data.table camp (and possibly the endangered base R camp as well). In python, pandas is the starting point for any data manipulation, but lots of up and coming technologies with key improvements on pandas (polars, duckdb, SQL Alchemy just to name a few). These try to solve very real problems using pandas, including:
+
+1. Standardisation
+2. Speed
+3. Scale
+
+Pandas is designed only as an in-memory package, meaning that it cannot deal with SQL databases using the same syntax as pandas code. It cannot deal with data bigger than memory, and it is slower than new up-and-coming packages. 
+
+Even the pandas founder Wes McKinney had [10 things he hates about pandas](https://wesmckinney.com/blog/apache-arrow-pandas-internals/). While the new pandas version 2.0 has some improvements (using arrow as backend rather than the slower numpy), it still doesn't resolve these three issues.
+
+Here is my recommended approach to data manipulation in python, dealing with each of these issues... 
+[Ibis](https://ibis-project.org/) (which started in 2015 by the pandas founder as well as top pandas contributers)
+
+## Standardisation
+Datasets and databases can come in many forms: csv files, excel files, SQL database files, hadoop databases. Each of these backends needs a different language to query them. What if there was one syntax we could use to query in-memory datasets as well as from SQL databases?
+The ***Ibis*** framework provides a standardised API that is simple to learn and works across 15+ backends. 
+
+## Speed
+For me, speed in programming can mean:
+
+1. Speed in reading the code for understanding
+2. Speed in writing code to do what you want 
+3. Speed in the compute power executing your code
+
+I would argue the importance of these speed aspects are in the order as shown, with the most important being speed in reading the code. Developers need to read code probably 10x more than they write the code, so developing clean code that quickly makes sense is part of speed of development. Related to this is of course speed of writing up the code, with a simple structure (including chaining of commands) to understand the flow from left to right. Lastly, speed of compute power is important to not slow down your code development waiting for run-times limiting the immediate feedback to continue on course.
+
+## Scale
+If pandas can only deal with in-memory datasets, you are limited by the size of the data. There are lots of different workarounds that can be done (including sampling the data, splitting up the data in batches, using different packages, scaling up your hardware, using cloud compute with bigger specs). If we think about standardisation and speed requirements to achieve our scale, workarounds will not be the best solution. 
+
+# Ibis standardisation
+Ibis provides a clean, standardised way to manipulate data using one syntax to deal with many different backends (including pandas, different dialects of SQL databases). Here are some examples of key statements
+```{python}
+#| eval: false
+# note package name is not ibis. This is a different package that shouldn't be used
+! pip install ibis-framework[duckdb] # duckdb is the default backend
+! pip install ibis-framework[pandas]
+! pip install ibis-framework[polars]
+! pip install ibis-framework[mssql]
+# every backend you use will need to be installed separately. 
+```
+
+```{python}
+# set up of the imports
+import ibis
+from ibis import _ # _ is a shortcut way so we don't keep repeating the table name
+ibis.options.interactive = True # this is useful to quckly show the first 10 rows of data lazily
+```
+
+Let's start with similar dataset that was used in our previous article ['tidy python pandas'](tidy_pandas.qmd) and find an easy way to express key tasks in data manipulation
+
+```{python}
+import pandas as  pd
+
+# set up the data
+policies_pandas = pd.DataFrame({
+    'policy_number': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    'risk_type': ['Life', 'Life', 'Life', 'Life', 'Life', 'TPD', 'DI', 'TPD', 'DI', 'Trauma'],
+    'gender': ['M', 'M', 'F', 'F', 'M', 'M', 'M', 'F', 'F', 'M'],
+    'exposure': [1, 0.5, 0.2, 0.7, 1, 1, 1, 0.8, 0.9, 1],
+    'claim': [0, 0, 0, 0, 0, 0, 0, 1, 0, 0]
+})
+policies = ibis.memtable(policies_pandas) # create a 'connection' to the dataframe as a memory table
+policies
+```
+
+Setting up a memory table connection to pandas datasets allows for quick understanding of the data. Notice how there is automatic datatypes printed out along with the first 10 rows. 
+
+## ***Select*** columns in your dataset
+
+```{python}
+policies.select('risk_type', 'gender', 'exposure', 'claim')
+```
+
+Ibis also has some helper functions to select a subset. Here's some examples:
+
+```{python}
+import ibis.selectors as s
+policies.select(s.endswith('type') | s.startswith('gender') | s.numeric())
+# ends with type or starts with gender or is numeric
+```
+
+
+```{python}
+# try where for more complicated ones
+# can also use the & for AND
+policies.select(s.where(lambda col: col.get_name() == "exposure") & s.contains('exp'))
+```
+
+## **filter** rows based on conditions
+
+```{python}
+policies.filter(_.gender=="M")
+```
+
+here the special _ is used so we don't have to repeat the policies name again.
+
+
+```{python}
+# equivalent to above but longer (not recommended)
+policies.filter(policies.gender=="M")
+policies.filter(policies['gender']=="M")
+```
+
+
+```{python}
+# other examples:
+policies.filter(_.risk_type.isin(['Life', 'TPD']))
+```
+
+## ***Order_by*** different variables ascending or descending
+
+
+```{python}
+policies.order_by(['risk_type', 'gender'])
+```
+
+```{python}
+# descending policy number
+policies.order_by([ _.policy_number.desc(), 'risk_type'])
+policies.order_by([ibis.desc(_.policy_number), 'risk_type'])
+# both do the same thing
+```
+
+## Use ***mutate*** to create extra columns based on existing columns
+
+
+```{python}
+policies.mutate(risk_and_gender=_.risk_type + " " + _.gender)
+```
+
+
+```{python}
+# other examples
+policies.mutate(risk_type_map = _.risk_type[:1]) #get the first character of risk_type
+```
+
+
+```{python}
+policies.mutate(gender_map = _.gender.case().when('M', 'Male').else_('Female').end())
+# if M => set to Male, otherwise Female
+```
+
+
+```{python}
+# This is a little tricker, requiring lambda function (because _ is used after case())
+policies.mutate(exposure_group = lambda _: ibis.case() \
+    .when(_.exposure > 0.5, 'over') \
+    .else_('under') \
+    .end())
+# note the underscore after else because else is a key work in python
+# also don't forget the end function required
+```
+
+## **Group_by** variables and **Aggregate** your dataset 
+
+In order to summarise your data (and potentially after grouping by certain variables), this can all be chained together in one statement
+
+
+```{python}
+policies.aggregate(exposure = _.exposure.sum(),
+                   claim = _.claim.count())
+```
+
+## Putting it togther by chaining
+
+The advantages of applying only these 5 verbs to remember in ibis (and any backend from SQL to pyspark to csv to parquet files) to deal with 80% of your data manipulation problems means there is less to remember, and understand other people's code. There is predictable inputs and outputs, and you can chain commands so it is readable, and immutable tables will be clearer and reduce errors.
+
+
+```{python}
+policies2 = policies \
+    .select(['risk_type', 'gender', 'exposure', 'claim']) \
+    .filter(_.risk_type !="DI") \
+    .order_by(['risk_type', 'gender']) \
+    .mutate(risk_and_gender=_.risk_type + " " + _.gender) \
+    .group_by('risk_and_gender') \
+    .aggregate(exposure = _.exposure.sum(), claim = _.claim.sum()) \
+    .mutate(incidence = _.claim / _.exposure) 
+policies2
+```
+
+## Summary of syntax
+
+
+```{python}
+#| eval: false
+import ibis
+from ibis import _
+ibis.options.interactive = True
+
+# select dataframe
+df = ibis.memtable(pandas_df)
+
+# subset rows
+df.filter(_.column1 == "A")
+
+# create new columns
+df.mutate(column1 - _.column1 + 1)
+
+# Group by variables / aggregate
+df.group_by('key') \
+    .aggregate(col1sum = _.column1.sum())
+
+# sort
+df.order_by('column1')
+```
+
+Ibis docs has useful documentation:
+
+- Coming from pandas?: Check out [Ibis for pandas users](https://ibis-project.org/ibis-for-pandas-users/)
+- Coming from SQL?: Take a look at [Ibis for SQL programmers](https://ibis-project.org/ibis-for-sql-programmers/)
+- Coming from R?: See [Ibis for dplyr users](https://ibis-project.org/ibis-for-dplyr-users/)
+
+
+# Speed
+
+We mentioned the speed of understanding and writing the code emanating from the standardisation earlier. Now let's focus on speed of computation
+
+```{python}
+#| eval: false
+# Large 4GB file
+file = pd.read_csv(Path(directory) / 'exposure.data.csv') \
+    [['sex', 'attain.age', 'claim.exposure.by.count']] \
+    .query('sex=="m"') \
+    .groupby('attain.age') \
+    .aggregate(claim_exposure = ('claim.exposure.by.count', 'sum'))
+```
+
+This takes 1m 56secs on my PC.[^1] 
+
+[^1]: If we use the usecols paramater in pd.read_csv to limit the columns read in, it reduces to 1m 3.2 secs. We can't use the nrows argument to limit rows as we need to read all the rows
+
+
+```{python}
+#| eval: false
+
+# now let's speed up our code writing / reading by standardising using the ibis syntax (which wil be re-sued with different backends)
+ibis.set_backend('pandas')
+exp2018 = ibis.memtable(pd.read_csv(Path(directory) / 'exposure.data.csv')) # convert to ibis memory table
+exp2018 \
+    .select('sex', 'attain.age', 'claim.exposure.by.count') \
+    .filter(_.sex=='m') \
+    .group_by('attain.age') \
+    .aggregate(claim_exposure = _['claim.exposure.by.count'].sum())
+```
+
+This takes slighly longer at 2m14secs with the overhead of converting to ibis, but the savings in syntax can be seen with different backends (you wouldn't normally use the pandas backend as default)
+
+
+```{python}
+#| eval: false
+
+ibis.set_backend('duckdb') # this is default if didn't set manually
+exp2018 = ibis.read_csv(Path(directory) / 'exposure.data.extract.2018.csv') # for duckdb backend can more simply use ibis.read_csv function
+exp2018 \
+    .select('sex', 'attain.age', 'claim.exposure.by.count') \
+    .filter(_.sex=='m') \
+    .group_by('attain.age') \
+    .aggregate(claim_exposure = _['claim.exposure.by.count'].sum())
+```
+
+Slightly faster using the duckdb default backend at 1m 4.1secs
+
+
+```{python}
+#| eval: false
+
+# try using polars backend
+ibis.set_backend('polars')
+exp2018 = ibis.read_csv(Path(directory) / 'exposure.data.extract.csv') # Large 4GB file
+exp2018 \
+    .select('sex', 'attain.age', 'claim.exposure.by.count') \
+    .filter(_.sex=='m') \
+    .group_by('attain.age') \
+    .aggregate(claim_exposure = _['claim.exposure.by.count'].sum())
+```
+
+which takes only 35 secs
+
+So as you can see, we can increase our speed by:
+
+- standardising our coding syntax
+- using duckdb or polars backend
+
+| Backend | Time (to the nearest 30 secs) | Faster Than Pandas |
+|---------|-------------------------------|--------------------|
+| Pandas  | 2 mins                        | 1x                 |
+| DuckDB  | 1 min                         | 2x                 |
+| Polars  | 30 secs                       | 4x                 |
+
+Other ideas / considerations:
+
+- you can experiement with different backends, but I'd use duckdb and polars first (polars is technically experimental mode, but worked quite well for me in initial tests)
+- you can use ibis.read_parquet (recommended better way to store and access data compared with csv, including quicker to select different columns, in-built datatypes and better compression)
+- I had some issues with dirty / corrupt csv files using duckdb backend, and worked fine with polars
+- 'lazy' evaluation means that you need to use .execute() to save file to pandas dataframe.  It will automatically work out the most efficient way to run the query before executing for maximum speed
+- When loading ibis datasets (ibis.read_csv), it is pretty quick to print out the first 10 rows. This magic is from the implementation doing 'lazy' loading (as opposed to eager loading). In pandas, the pd.read_csv command would try to load the whole dataset into memory (causing an error or a crash if not enough memory). Using ibis, it actually only loads the first 10 rows to print out (lazily doing all that is required). Of course we could adjust the command to select only certain variables and filter certain rows, creating new columns and returning the smaller dataset required as a pandas dataframe in-memory. 
+
+# Scale
+
+Things are all fine when datasets are small, until speeds are unbearably slow and you run out of memory. Your data might be in an SQL database or a hodoop / pyspark or other database that you want to access in the same way.
+
+Let's try to handle this large 38 million row exposure dataset... if you start with pandas
+
+
+```{python}
+#| eval: false
+
+import pandas as pd
+
+exp2018 = pd.read_parquet(Path(directory) / 'exp2018.parquet') 
+exp2019 = pd.read_parquet(Path(directory) / 'exp2019.parquet') 
+exp2020 = pd.read_parquet(Path(directory) / 'exp2020.parquet') 
+exp2021 = pd.read_parquet(Path(directory) / 'exp2021.parquet') 
+expall = pd.concat([exp2018, exp2019, exp2020, exp2021])
+
+group_these_strings = ['client.id', 'age', 'age_group', 'sex', 'original.issue.date',
+ 'maturity.date', 'exposure.start', 'exposure.end', 'cal_year', 'retail.study',
+ 'prem_type', 'indemnity', 'table.code', 'fiscal_year', 'fsc.ls.sum.assured.band.new',
+ 'fsc.benefit.band', 'exposure_end', 'exposure_start', 'maturity_date', 'original_issue_date',
+ 'unique_policy_cover_exp', 'si_band', 'risk_and_prem_type', 'risk_type',
+ 'unique_policy_cover', 'duration', 'duration_years', 'claim.number']
+
+exp_summary = expall \
+    .groupby(group_these_strings) \
+    .aggregate(benefit_count = ('benefit.count', 'sum'),
+                benefit_amount = ('benefit.amount', 'sum'))
+```
+
+**ValueError**: Product space too large to allocate arrays!
+
+After waiting for 3 minutes and using up my 32GB memory on my laptop.. we can't continue because of a memory error. What to do?
+
+
+```{python}
+#| eval: false
+
+# load each yearly dataset
+ibis.set_backend('duckdb')
+exp2018 = ibis.read_parquet(Path(directory) / 'exp2018.parquet') 
+exp2019 = ibis.read_parquet(Path(directory) / 'exp2019.parquet') 
+exp2020 = ibis.read_parquet(Path(directory) / 'exp2020.parquet') 
+exp2021 = ibis.read_parquet(Path(directory) / 'exp2021.parquet') 
+
+# stack datasets together
+expall = exp2018.union(exp2019).union(exp2020).union(exp2021)
+
+exp_summary = expall \
+    .group_by(group_these_strings) \
+    .aggregate(benefit_count = _['benefit.count'].sum(), 
+               benefit_amount = _['benefit.amount'].sum())
+
+
+import ibis.selectors as s
+exp_summary \
+    .select(~s.contains(['unique_policy_cover', 'client.id']))
+```
+
+This took 5 minutes 45 secs (compared to pandas fail)
+
+
+```{python}
+#| eval: false
+
+# try using the arrow dataset through duckdb that allows out of memory parquet file manipulation
+
+import pyarrow.dataset as ds
+connection = ibis.duckdb.connect()
+exp2018 = connection.register(ds.dataset(Path(directory) / 'exp2018.parquet'), table_name='exp2018')
+exp2019 = connection.register(ds.dataset(Path(directory) / 'exp2018.parquet'), table_name='exp2019')
+exp2020 = connection.register(ds.dataset(Path(directory) / 'exp2018.parquet'), table_name='exp2020')
+exp2021 = connection.register(ds.dataset(Path(directory) / 'exp2018.parquet'), table_name='exp2021')
+
+# stack datasets together
+expall = exp2018.union(exp2019).union(exp2020).union(exp2021)
+
+# summarise
+exp_summary = expall \
+    .group_by(group_these_strings) \
+    .aggregate(benefit_count = _['benefit.count'].sum(), 
+               benefit_amount = _['benefit.amount'].sum())
+exp_summary.select(~s.contains(['unique_policy_cover', 'client.id']))
+```
+
+Here's a way to use the new Apache Arrow dataset (as opposed to the Apache Table in-memory format) to run this query. Looking at the task manager, the memory footprint for this reduced considerably and was also faster at 3m 47secs. This is a gamechanger in terms of being able to deal with very large (parquet) datasets on your local computer with very small memory usage
+
+
+```{python}
+#| eval: false
+# try using polars
+ibis.set_backend('polars')
+
+# load each yearly dataset
+exp2018 = ibis.read_parquet(Path(directory) / 'exp2018.parquet') 
+exp2019 = ibis.read_parquet(Path(directory) / 'exp2019.parquet') 
+exp2020 = ibis.read_parquet(Path(directory) / 'exp2020.parquet') 
+exp2021 = ibis.read_parquet(Path(directory) / 'exp2021.parquet') 
+
+# stack datasets together
+expall = exp2018.union(exp2019).union(exp2020).union(exp2021)
+
+group_these_strings = ['client.id', 'age', 'age_group', 'sex', 'original.issue.date',
+ 'maturity.date', 'exposure.start', 'exposure.end', 'cal_year', 'retail.study',
+ 'prem_type', 'indemnity', 'table.code', 'fiscal_year', 'fsc.ls.sum.assured.band.new',
+ 'fsc.benefit.band', 'exposure_end', 'exposure_start', 'maturity_date', 'original_issue_date',
+ 'unique_policy_cover_exp', 'si_band', 'risk_and_prem_type',
+ 'unique_policy_cover', 'duration', 'duration_years', 'claim.number', 'risk_type']
+
+expall.group_by(group_these_strings).aggregate(benefit_count = _['benefit.count'].sum())
+```
+
+**PanicException**: should not fail: ComputeError(ErrString("cannot concat categoricals coming from a different source; consider setting a global StringCache"))
+
+Polars is giving an error here. Looking into it, the risk_type field is causing issues. If we remove this we get significantly faster results. (risk_type isn't actually required since it is included in the risk_and_prem_type anyway)
+
+
+```{python}
+#| eval: false
+
+group_these_strings = ['client.id', 'age', 'age_group', 'sex', 'original.issue.date',
+ 'maturity.date', 'exposure.start', 'exposure.end', 'cal_year', 'retail.study',
+ 'prem_type', 'indemnity', 'table.code', 'fiscal_year', 'fsc.ls.sum.assured.band.new',
+ 'fsc.benefit.band', 'exposure_end', 'exposure_start', 'maturity_date', 'original_issue_date',
+ 'unique_policy_cover_exp', 'si_band', 'risk_and_prem_type', 'unique_policy_cover', 'duration', 'duration_years', 'claim.number'] # remove risk_type
+
+# summarise
+exp_summary = expall \
+    .group_by(group_these_strings) \
+    .aggregate(benefit_count = _['benefit.count'].sum(), 
+               benefit_amount = _['benefit.amount'].sum())
+
+# execute, showing the top 10 rows
+exp_summary.select(~s.contains(['unique_policy_cover', 'client.id']))
+```
+
+this runs much faster at 1m 11.8s
+
+Footnote: A little-known trick is to use the observed=True argument in pandas groupby to make it not do all combinations at once (not sure why this is not the default in pandas). This is another way to make the pandas implementation workable in this example. The below shows how this can be done, but takes the longest run-time at 7 minutes
+
+
+```{python}
+#| eval: false
+
+import pandas as pd
+
+exp2018 = pd.read_parquet(Path(directory) / 'exp2018.parquet') 
+exp2019 = pd.read_parquet(Path(directory) / 'exp2019.parquet') 
+exp2020 = pd.read_parquet(Path(directory) / 'exp2020.parquet') 
+exp2021 = pd.read_parquet(Path(directory) / 'exp2021.parquet') 
+expall = pd.concat([exp2018, exp2019, exp2020, exp2021])
+group_these_strings = ['client.id', 'age', 'age_group', 'sex', 'original.issue.date',
+ 'maturity.date', 'exposure.start', 'exposure.end', 'cal_year', 'retail.study',
+ 'prem_type', 'indemnity', 'table.code', 'fiscal_year', 'fsc.ls.sum.assured.band.new',
+ 'fsc.benefit.band', 'exposure_end', 'exposure_start', 'maturity_date', 'original_issue_date',
+ 'unique_policy_cover_exp', 'si_band', 'risk_and_prem_type', 'risk_type',
+ 'unique_policy_cover', 'duration', 'duration_years', 'claim.number']
+exp_summary = expall \
+    .groupby(group_these_strings, observed=True) \
+    .aggregate(benefit_count = ('benefit.count', 'sum'),
+                benefit_amount = ('benefit.amount', 'sum'))
+```
+
+# Summary
+- When datasets are too large, pandas is not suitable. 
+- Different backends can be tried for speed (Polars) and scale (duckdb, especially using arrow dataset)
+- using ibis allows you to use the same syntax for: 
+  - small datasets (might use pandas), 
+  - medium datasets (might use polars or duckdb),
+  - large datasets (might use duckdb with arrow dataset backend)
+  which improves speed of development and understanding across all dataset sizes
+
+Which backend to use? try these:
+
+- default: use duckdb as this is the default anyway and provides good balance with effectiveness, speed and scale
+- polars: use for speed, but might get some errors as still experimental
+- duckdb with arrow dataset: use for very large datasets that will not normally fit into your memory
+- pandas: use for small datasets, or where the ibis API does not allow any complex transformation. 
+- mssql: if your current database exists as Microsoft SQL database this makes sense to use
+- pyspark: if you have a databricks database
+
+R users familiar with the tidyverse ecosystem have similar functionality utilising dplyr syntax to access in-memory datasets, out-of memory datasets using Apache Arrow, as well as databases including duckdb (using dbplyr) and hadoop spark datasets (sparklyr) and fast data.table access (through dtplyr).
+
+
+## Cheatsheet
+
+
+```{python}
+
+#| eval: false
+
+# installations
+! pip install ibis-framework[duckdb] # duckdb is the default backend
+! pip install ibis-framework[pandas]
+! pip install ibis-framework[polars]
+! pip install ibis-framework[mssql]
+
+# Initialisations
+import ibis
+from ibis import _
+ibis.options.interactive = True
+
+# import data
+ibis.read_csv('file_name.csv')
+ibis.read_parquet('file_name.parquet')
+ibis.memtable(pandas_df)
+
+# for large parquet datasets out of memory using duckdb and apache arrow dataset
+import pyarrow.dataset as ds
+connection = ibis.duckdb.connect()
+pq_data = connection.register(ds.dataset('file_name.parquet'), table_name='table_name')
+# and then run ibis syntax as per below on pq_data
+
+# MS SQL
+host = 'hostname'
+port = 1433
+driver = 'ODBC Driver 17 for SQL Server'
+def connection_string(database):
+    """ function to create connection string to database"""
+    return f'mssql+pyodbc://{host}:{port}/{database}?driver={driver}'
+
+# selecting different databases
+db = ibis.mssql.connect(url=connection_string(database='dbname'))
+premiums = dbname.table('tablename', schema='schemaname')
+
+# subset rows
+df.filter(_.column1 == "A")
+
+# create new columns
+df.mutate(column1 - _.column1 + 1)
+
+# Group by variables / aggregate
+df.group_by('key') \
+    .aggregate(col1sum = _.column1.sum())
+
+# sort
+df.order_by('column1')
+```
+
+Other examples
+
+
+```{python}
+#| eval: false
+
+# first understand the data
+policy.schema() #instead of polcy.dtypes
+#policy.shape # no shape property
+policy.count().execute() # rowcount
+len(policy.schema()) # columns
+
+policy.head()
+policy.info()
+
+policy.Gender.value_counts() #notice how you apply this to the series
+
+# select the variables we care about
+cols = [
+    'Policy_ID', 'Gender', 'Date_of_Birth', 'Date_of_Commencement',
+    'Main_Risk_Type', 'Acceleration_Risk_Type', 'Risk_Amount_Insurer',
+    'Acceleration_Risk_Amount_Insurer', 'Date_of_Begin_Current_Condition',
+    'Date_of_End_Current_Condition', 'Status_Begin_Current_Condition',
+    'Status_End_Current_Condition', 'Type_of_Event',
+    'Date_of_Event_Incurred', 'Event_Amount_Insurer', 'Product_ID']
+pol = policy.select(cols)
+
+import ibis.selectors as s
+policies.select(s.endswith('type') | s.startswith('gender') | s.numeric())
+# ends with type or starts with gender or is numeric
+policies.select(s.where(lambda col: col.get_name() == "exposure") & s.contains('exp'))
+
+
+# filter examples
+pol.filter(_.Policy_ID == "0000c45ca43ef3511a140a47a24fb21f")  # equal
+pol.filter(_.Gender != 'Male')  # not equal, # notice different quotes
+pol.filter(_.Gender.isin(["Male", "Female"]))  # isin
+pol.filter(_.Date_of_Birth.year() > 1970)  # applying date functions
+
+# create new calculated column
+pol.mutate(year = _.Date_of_Birth.year().cast('string') +
+    _.Date_of_Birth.month().cast('string'))
+pol.mutate(sex=_.Gender.case() \
+    .when('Male', 'M') \
+    .when('Female', 'F') \
+    .end())
+pol.mutate(sex=_.Gender[:1])  # same as above appply str fn
+pol.mutate(dead=lambda _: ibis.case() \
+    .when(_.Type_of_Event == 'Death', 1) \
+    .else_(0) \
+    .end())
+
+# chaining together
+policy[cols] \
+    .filter(_['Main_Risk_Type'] == "Life") \
+    .mutate(sex=_.Gender[:1]) \
+    .left_join(product, 'Product_ID')
+
+# stacking datasets
+exposure = policy_split.filter(_.Exposure_or_Event=="Exposure")       
+event = policy_split.filter(_.Exposure_or_Event=="Event")
+ibis.union(exposure, event)
+
+# groupby summaries
+pol.mutate(exposure_days= _.Date_of_End_Current_Condition - _.Date_of_Begin_Current_Condition) \
+    .group_by('Gender') \
+    .aggregate(event_amount=_.Event_Amount_Insurer.sum())
+
+# pivot table
+policy_split \
+    .select('Smoker_Status', 'Type_of_Event', 'Event_Amount_Insurer') \
+    .pivot_wider(names_from='Type_of_Event', values_from='Event_Amount_Insurer')
+```

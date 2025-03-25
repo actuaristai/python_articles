@@ -6,11 +6,13 @@ date-modified: last-modified
 format: 
   html:
     number-sections: true
-    code-fold: show
-    code-tools:
-      source: false
-      toggle: true
-      caption: Code
+    echo: true
+    toc: true
+    #code-fold: show
+    #code-tools:
+    #  source: false
+    #  toggle: true
+    #  caption: Code
 
 # jupyter: python_articles # uv run python -m ipykernel install --user --name python_articles
 execute:

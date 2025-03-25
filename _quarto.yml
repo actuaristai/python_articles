@@ -30,4 +30,6 @@ website:
     left:
       - text: "Tidy Pandas"
         file: docs/tidy_pandas.qmd
+      - text: "Ibis"
+        file: docs/ibis.qmd
 
