@@ -5,6 +5,8 @@ annotated-types==0.7.0
     # via pydantic
 asttokens==3.0.0
     # via stack-data
+atpublic==5.1
+    # via ibis-framework
 attrs==25.3.0
     # via
     #   jsonschema
@@ -40,6 +42,8 @@ debugpy==1.8.13
     # via ipykernel
 decorator==5.2.1
     # via ipython
+duckdb==1.2.1
+    # via ibis-framework
 dynaconf==3.2.10
     # via python-articles (pyproject.toml)
 executing==2.2.0
@@ -48,6 +52,8 @@ fastjsonschema==2.21.1
     # via nbformat
 griffe==1.6.2
     # via quartodoc
+ibis-framework==10.3.1
+    # via python-articles (pyproject.toml)
 idna==3.10
     # via requests
 importlib-metadata==8.6.1
@@ -101,16 +107,23 @@ nbformat==5.10.4
 nest-asyncio==1.6.0
     # via ipykernel
 numpy==2.2.4
-    # via pandas
+    # via
+    #   ibis-framework
+    #   pandas
 packaging==24.2
     # via
     #   black
+    #   ibis-framework
     #   ipykernel
     #   pytest
 pandas==2.2.3
-    # via python-articles (pyproject.toml)
+    # via
+    #   python-articles (pyproject.toml)
+    #   ibis-framework
 parso==0.8.4
     # via jedi
+parsy==2.1
+    # via ibis-framework
 pathspec==0.12.1
     # via black
 platformdirs==4.3.7
@@ -127,6 +140,10 @@ psutil==7.0.0
     # via ipykernel
 pure-eval==0.2.3
     # via stack-data
+pyarrow==19.0.1
+    # via ibis-framework
+pyarrow-hotfix==0.6
+    # via ibis-framework
 pydantic==2.10.6
     # via quartodoc
 pydantic-core==2.27.2
@@ -144,6 +161,7 @@ pytest-cov==6.0.0
     # via python-articles (pyproject.toml)
 python-dateutil==2.9.0.post0
     # via
+    #   ibis-framework
     #   jupyter-client
     #   pandas
 pytz==2025.2
@@ -166,6 +184,7 @@ requests==2.32.3
     # via quartodoc
 rich==13.9.4
     # via
+    #   ibis-framework
     #   plum-dispatch
     #   typer
 rpds-py==0.23.1
@@ -180,6 +199,8 @@ six==1.17.0
     # via python-dateutil
 sphobjinv==2.3.1.2
     # via quartodoc
+sqlglot==26.11.1
+    # via ibis-framework
 stack-data==0.6.3
     # via ipython
 tabulate==0.9.0
@@ -188,6 +209,8 @@ tabulate==0.9.0
     #   quartodoc
 toml==0.10.2
     # via python-articles (pyproject.toml)
+toolz==1.0.0
+    # via ibis-framework
 tornado==6.4.2
     # via
     #   ipykernel
@@ -206,14 +229,16 @@ typer==0.15.2
     # via python-articles (pyproject.toml)
 typing-extensions==4.12.2
     # via
+    #   ibis-framework
     #   plum-dispatch
     #   pydantic
     #   pydantic-core
     #   quartodoc
-    #   referencing
     #   typer
 tzdata==2025.2
-    # via pandas
+    # via
+    #   ibis-framework
+    #   pandas
 urllib3==2.3.0
     # via requests
 watchdog==6.0.0
