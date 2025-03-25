@@ -27,8 +27,7 @@ website:
   navbar:
     background: primary
     search: true
-    title: Docs
     left:
-      - text: "Reference API"
-        file: reference/index.qmd
+      - text: "Tidy Pandas"
+        file: docs/tidy_pandas.qmd
 
