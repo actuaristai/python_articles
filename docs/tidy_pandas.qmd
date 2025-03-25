@@ -10,7 +10,7 @@ format:
     code-tools:
       source: false
       toggle: true
-      caption: none
+      caption: Code
 
 # jupyter: python_articles # uv run python -m ipykernel install --user --name python_articles
 execute:
