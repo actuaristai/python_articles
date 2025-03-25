@@ -103,14 +103,18 @@ policies.select(s.where(lambda col: col.get_name() == "exposure") & s.contains('
 ## **filter** rows based on conditions
 
 ```{python}
-policies.filter(_.gender=="M")
+policies.filter(_['gender']=="M")
 ```
 
 here the special _ is used so we don't have to repeat the policies name again.
 
+::: {.callout-info collapse="false"}
+Like pandas, we can use dot notation or brackets notation to define columns. The brackets notation, while a bit longer to write and lacking autocomplete, is much easier to read (with colouring) and more flexible with columns with spaces or dots. 
+:::
+
 
 ```{python}
-# equivalent to above but longer (not recommended)
+# equivalent to above but more easier to read and flexible
 policies.filter(policies.gender=="M")
 policies.filter(policies['gender']=="M")
 ```
@@ -118,10 +122,10 @@ policies.filter(policies['gender']=="M")
 
 ```{python}
 # other examples:
-policies.filter(_.risk_type.isin(['Life', 'TPD']))
+policies.filter(_['risk_type'].isin(['Life', 'TPD']))
 ```
 
-## ***Order_by*** different variables ascending or descending
+## ***Order_by*** different variables ascending or descendings
 
 
 ```{python}
@@ -130,8 +134,8 @@ policies.order_by(['risk_type', 'gender'])
 
 ```{python}
 # descending policy number
-policies.order_by([ _.policy_number.desc(), 'risk_type'])
-policies.order_by([ibis.desc(_.policy_number), 'risk_type'])
+policies.order_by([ _['policy_number'].desc(), 'risk_type'])
+policies.order_by([ibis.desc(_['policy_number']), 'risk_type'])
 # both do the same thing
 ```
 
@@ -139,30 +143,32 @@ policies.order_by([ibis.desc(_.policy_number), 'risk_type'])
 
 
 ```{python}
-policies.mutate(risk_and_gender=_.risk_type + " " + _.gender)
+policies.mutate(risk_and_gender=_['risk_type'] + ' ' + _['gender'])
 ```
 
 
 ```{python}
 # other examples
-policies.mutate(risk_type_map = _.risk_type[:1]) #get the first character of risk_type
+policies.mutate(risk_type_map=_['risk_type'][:1]) #get the first character of risk_type
 ```
 
 
 ```{python}
-policies.mutate(gender_map = _.gender.case().when('M', 'Male').else_('Female').end())
+policies.mutate(gender_map=_['gender'].cases(('M', 'Male'), else_='Female'))
 # if M => set to Male, otherwise Female
 ```
+
+::: {.callout-warning collapse="false"}
+previous version (before 10.0) used Value.case instead like this:
+`policies.mutate(gender_map = _['gender'].cases().when('M', 'Male').else_('Female').end())`
+
+Now the syntax is changed to be clearer, using tuples
+:::
 
 
 ```{python}
 # This is a little tricker, requiring lambda function (because _ is used after case())
-policies.mutate(exposure_group = lambda _: ibis.case() \
-    .when(_.exposure > 0.5, 'over') \
-    .else_('under') \
-    .end())
-# note the underscore after else because else is a key work in python
-# also don't forget the end function required
+policies.mutate(exposure_group=ibis.cases((_['exposure'] > 0.5, 'over'),                                  else_='under'))
 ```
 
 ## **Group_by** variables and **Aggregate** your dataset 
@@ -171,8 +177,8 @@ In order to summarise your data (and potentially after grouping by certain varia
 
 
 ```{python}
-policies.aggregate(exposure = _.exposure.sum(),
-                   claim = _.claim.count())
+policies.aggregate(exposure = _['exposure'].sum(),
+                   claim = _['claim'].count())
 ```
 
 ## Putting it togther by chaining
@@ -183,12 +189,13 @@ The advantages of applying only these 5 verbs to remember in ibis (and any backe
 ```{python}
 policies2 = policies \
     .select(['risk_type', 'gender', 'exposure', 'claim']) \
-    .filter(_.risk_type !="DI") \
+    .filter(_['risk_type'] !='DI') \
     .order_by(['risk_type', 'gender']) \
-    .mutate(risk_and_gender=_.risk_type + " " + _.gender) \
+    .mutate(risk_and_gender=_['risk_type'] + ' ' + _['gender']) \
     .group_by('risk_and_gender') \
-    .aggregate(exposure = _.exposure.sum(), claim = _.claim.sum()) \
-    .mutate(incidence = _.claim / _.exposure) 
+    .aggregate(exposure=_['exposure'].sum(),
+               claim=_['claim'].sum()) \
+    .mutate(incidence=_['claim'] / _['exposure']) 
 policies2
 ```
 
@@ -205,14 +212,14 @@ ibis.options.interactive = True
 df = ibis.memtable(pandas_df)
 
 # subset rows
-df.filter(_.column1 == "A")
+df.filter(_['column1'] == "A")
 
 # create new columns
-df.mutate(column1 - _.column1 + 1)
+df.mutate(column1=_['column1'] + 1)
 
 # Group by variables / aggregate
 df.group_by('key') \
-    .aggregate(col1sum = _.column1.sum())
+    .aggregate(col1sum=_['column1'].sum())
 
 # sort
 df.order_by('column1')
@@ -236,7 +243,7 @@ file = pd.read_csv(Path(directory) / 'exposure.data.csv') \
     [['sex', 'attain.age', 'claim.exposure.by.count']] \
     .query('sex=="m"') \
     .groupby('attain.age') \
-    .aggregate(claim_exposure = ('claim.exposure.by.count', 'sum'))
+    .aggregate(claim_exposure=('claim.exposure.by.count', 'sum'))
 ```
 
 This takes 1m 56secs on my PC.[^1] 
@@ -252,12 +259,16 @@ ibis.set_backend('pandas')
 exp2018 = ibis.memtable(pd.read_csv(Path(directory) / 'exposure.data.csv')) # convert to ibis memory table
 exp2018 \
     .select('sex', 'attain.age', 'claim.exposure.by.count') \
-    .filter(_.sex=='m') \
+    .filter(_['sex']=='m') \
     .group_by('attain.age') \
-    .aggregate(claim_exposure = _['claim.exposure.by.count'].sum())
+    .aggregate(claim_exposure=_['claim.exposure.by.count'].sum())
 ```
 
 This takes slighly longer at 2m14secs with the overhead of converting to ibis, but the savings in syntax can be seen with different backends (you wouldn't normally use the pandas backend as default)
+
+::: {.callout-warning collapse="false"}
+Latest version of ibis (10.0) has deprecated the pandas backend
+:::
 
 
 ```{python}
@@ -267,9 +278,9 @@ ibis.set_backend('duckdb') # this is default if didn't set manually
 exp2018 = ibis.read_csv(Path(directory) / 'exposure.data.extract.2018.csv') # for duckdb backend can more simply use ibis.read_csv function
 exp2018 \
     .select('sex', 'attain.age', 'claim.exposure.by.count') \
-    .filter(_.sex=='m') \
+    .filter(_['sex']=='m') \
     .group_by('attain.age') \
-    .aggregate(claim_exposure = _['claim.exposure.by.count'].sum())
+    .aggregate(claim_exposure=_['claim.exposure.by.count'].sum())
 ```
 
 Slightly faster using the duckdb default backend at 1m 4.1secs
@@ -283,9 +294,9 @@ ibis.set_backend('polars')
 exp2018 = ibis.read_csv(Path(directory) / 'exposure.data.extract.csv') # Large 4GB file
 exp2018 \
     .select('sex', 'attain.age', 'claim.exposure.by.count') \
-    .filter(_.sex=='m') \
+    .filter(_['sex']=='m') \
     .group_by('attain.age') \
-    .aggregate(claim_exposure = _['claim.exposure.by.count'].sum())
+    .aggregate(claim_exposure=_['claim.exposure.by.count'].sum())
 ```
 
 which takes only 35 secs
@@ -360,8 +371,8 @@ expall = exp2018.union(exp2019).union(exp2020).union(exp2021)
 
 exp_summary = expall \
     .group_by(group_these_strings) \
-    .aggregate(benefit_count = _['benefit.count'].sum(), 
-               benefit_amount = _['benefit.amount'].sum())
+    .aggregate(benefit_count=_['benefit.count'].sum(), 
+               benefit_amount=_['benefit.amount'].sum())
 
 
 import ibis.selectors as s
@@ -487,7 +498,6 @@ Which backend to use? try these:
 - default: use duckdb as this is the default anyway and provides good balance with effectiveness, speed and scale
 - polars: use for speed, but might get some errors as still experimental
 - duckdb with arrow dataset: use for very large datasets that will not normally fit into your memory
-- pandas: use for small datasets, or where the ibis API does not allow any complex transformation. 
 - mssql: if your current database exists as Microsoft SQL database this makes sense to use
 - pyspark: if you have a databricks database
 
@@ -536,14 +546,14 @@ db = ibis.mssql.connect(url=connection_string(database='dbname'))
 premiums = dbname.table('tablename', schema='schemaname')
 
 # subset rows
-df.filter(_.column1 == "A")
+df.filter(_['column1'] == 'A')
 
 # create new columns
-df.mutate(column1 - _.column1 + 1)
+df.mutate(column1=_['column1'] + 1)
 
 # Group by variables / aggregate
 df.group_by('key') \
-    .aggregate(col1sum = _.column1.sum())
+    .aggregate(col1sum = _['column1'].sum())
 
 # sort
 df.order_by('column1')
@@ -564,7 +574,7 @@ len(policy.schema()) # columns
 policy.head()
 policy.info()
 
-policy.Gender.value_counts() #notice how you apply this to the series
+policy['Gender'].value_counts() #notice how you apply this to the series
 
 # select the variables we care about
 cols = [
@@ -583,42 +593,39 @@ policies.select(s.where(lambda col: col.get_name() == "exposure") & s.contains('
 
 
 # filter examples
-pol.filter(_.Policy_ID == "0000c45ca43ef3511a140a47a24fb21f")  # equal
-pol.filter(_.Gender != 'Male')  # not equal, # notice different quotes
-pol.filter(_.Gender.isin(["Male", "Female"]))  # isin
-pol.filter(_.Date_of_Birth.year() > 1970)  # applying date functions
+pol.filter(_['Policy_ID'] == "0000c45ca43ef3511a140a47a24fb21f")  # equal
+pol.filter(_['Gender'] != 'Male')  # not equal, # notice different quotes
+pol.filter(_['Gender'].isin(["Male", "Female"]))  # isin
+pol.filter(_['Date_of_Birth'].year() > 1970)  # applying date functions
 
 # create new calculated column
-pol.mutate(year = _.Date_of_Birth.year().cast('string') +
-    _.Date_of_Birth.month().cast('string'))
-pol.mutate(sex=_.Gender.case() \
-    .when('Male', 'M') \
-    .when('Female', 'F') \
-    .end())
-pol.mutate(sex=_.Gender[:1])  # same as above appply str fn
-pol.mutate(dead=lambda _: ibis.case() \
-    .when(_.Type_of_Event == 'Death', 1) \
-    .else_(0) \
-    .end())
+pol.mutate(year=_['Date_of_Birth'].year().cast('string') +
+    _['Date_of_Birth'].month().cast('string'))
+pol.mutate(sex=_['Gender'].cases(('Male', 'M'),
+                                 ('Female', 'F'),))
+pol.mutate(sex=_['Gender'][:1])  # same as above appply str fn
+pol.mutate(dead=ibis.cases((_['Type_of_Event'] == 'Death', 1),
+                           else_=0))
 
 # chaining together
 policy[cols] \
     .filter(_['Main_Risk_Type'] == "Life") \
-    .mutate(sex=_.Gender[:1]) \
+    .mutate(sex=_['Gender'][:1]) \
     .left_join(product, 'Product_ID')
 
 # stacking datasets
-exposure = policy_split.filter(_.Exposure_or_Event=="Exposure")       
-event = policy_split.filter(_.Exposure_or_Event=="Event")
+exposure = policy_split.filter(_['Exposure_or_Event']=="Exposure")       
+event = policy_split.filter(_['Exposure_or_Event']=="Event")
 ibis.union(exposure, event)
 
 # groupby summaries
-pol.mutate(exposure_days= _.Date_of_End_Current_Condition - _.Date_of_Begin_Current_Condition) \
+pol.mutate(exposure_days=_['Date_of_End_Current_Condition'] - _['Date_of_Begin_Current_Condition']) \
     .group_by('Gender') \
-    .aggregate(event_amount=_.Event_Amount_Insurer.sum())
+    .aggregate(event_amount=_['Event_Amount_Insurer'].sum())
 
 # pivot table
 policy_split \
     .select('Smoker_Status', 'Type_of_Event', 'Event_Amount_Insurer') \
-    .pivot_wider(names_from='Type_of_Event', values_from='Event_Amount_Insurer')
+    .pivot_wider(names_from='Type_of_Event',
+                 values_from='Event_Amount_Insurer')
 ```
