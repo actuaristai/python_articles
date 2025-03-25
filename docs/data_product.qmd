@@ -1,0 +1,24 @@
+---
+title: "Repository for..."
+format: 
+    html:
+        number-sections: true
+        html-table-processing: none
+jupyter: python_articles # uv run python -m ipykernel install --user --name python_articles
+echo: false
+execute:
+  freeze: auto  # re-render only when source changes
+---
+
+# Executive Summary
+
+This document summarises the python_articles ...
+
+Repository for publishing useful articles on python and data science
+
+## Key info
+
+-   Repository name: python_articles
+-   Author: Actuarist AI
+-   Repository location: git@github.com:actuaristai/python_articles.git
+
