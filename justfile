@@ -5,7 +5,6 @@ set shell:= ["pwsh.exe", "-c"]
 
 PROJECT_NAME:= "python_articles"
 REMOTE_REPO := "git@github.com:actuaristai/python_articles.git"
-PYTHONVERSION := "3.11.5"
 
 
 POWERSHELL_SHEBANG := if os() == 'windows' {
@@ -146,7 +145,7 @@ dvc-add NEWFILE:
 # release version with tag (only for maintainers with merge permissions). Usage: just cd-release 'yyyy.mm.dd'
 cd-release VERSION:
 	git checkout -b release-{{VERSION}} develop
-	uv run python project_management.py bump-version {{VERSION}}
+	uv run python bump_version.py {{VERSION}}
 	git commit -a -m "chore: Bumped version number to {{VERSION}}"
 	git checkout main
 	git merge --no-ff release-{{VERSION}}

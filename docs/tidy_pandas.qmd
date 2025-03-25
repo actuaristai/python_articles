@@ -1,0 +1,212 @@
+---
+title: "tidy Python Pandas"
+author: "William Lee"
+date: "1/3/2022"
+date-modified: last-modified
+format: 
+  html:
+    number-sections: true
+    echo: true
+    toc: true
+    #code-fold: show
+    #code-tools:
+    #  source: false
+    #  toggle: true
+    #  caption: Code
+
+# jupyter: python_articles # uv run python -m ipykernel install --user --name python_articles
+execute:
+  freeze: auto  # re-render only when source changes
+---
+
+# ‘tidy’ Python Pandas
+
+This article is for R users who like the easy-to-read dplyr way of piping data manipulation and would like to apply this in python (pandas).
+This is also for beginner python users wanting to learn to code in a robust way following ‘tidy’ principles :
+
+- Readable code designed for humans, applying the 'grammar of data manipulation'
+- Chaining commands ('verbs') together for readability from left to right, top to bottom
+- Immutable datasets for reproducibility (when I run some code on line 10, I don’t want it to affect any datasets from previous lines)
+- Using existing and widely used pandas data structure
+- inputs and outputs are datasets (rather than series types) for predictability
+
+One option is a package dedicated to this task: siuba package. However, this still doesn’t feel natural to use for me. I prefer using the standard pandas package if using certain methods and chaining commands together.
+
+The first thing to start with is the main 5 'verbs' that we use to manipulate data:
+
+1. select
+2. filter
+3. arrange
+4. mutate
+5. summarise
+
+These can be achieved within pandas in a similar way to dplyr.
+
+```{python}
+import pandas as  pd
+
+# set up the data
+
+policies = pd.DataFrame({
+    'policy_number': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    'risk_type': ['Life', 'Life', 'Life', 'Life', 'Life', 'TPD', 'DI', 'TPD', 'DI', 'Trauma'],
+    'gender': ['M', 'M', 'F', 'F', 'M', 'M', 'M', 'F', 'F', 'M'],
+    'exposure': [1, 0.5, 0.2, 0.7, 1, 1, 1, 0.8, 0.9, 1],
+    'claim': [0, 0, 0, 0, 0, 0, 0, 1, 0, 0]
+})
+policies
+```
+
+## Selecting columns of your data with **[[double brackets]]**
+This can be achieved with the [[column]] operator. (the filter method in pandas 
+also works, but I prefer not to confuse with the 'natural' definition of filter
+usually meaning filter row, rather than columns)
+
+```{python}
+# drop policy number field
+policies[['risk_type', 'gender', 'exposure', 'claim']]
+```
+
+## Filtering rows with a ***query***
+
+To filter rows, there are many ways using python (loc, and [] notations requiring retyping dataset name twice). I find the most powerful and easy way is using the query method:
+
+```{python}
+policies.query('gender=="M"')
+```
+
+isn't this easier than:
+
+```{python}
+policies[policies['gender']=="M"]
+policies.loc[policies['gender']=="M", :]
+```
+
+## ***Sort values*** of your dataset
+
+```{python}
+policies.sort_values(['risk_type', 'gender'])
+```
+
+## ***Assign*** extra columns based on calculations of existing columns
+
+Again pandas allows this to be done using many methods, but easy with assign method:
+
+```{python}
+policies.assign(risk_and_gender=lambda d: d['risk_type'] + " " + d['gender'])
+```
+
+This is slightly trickier to understand with the requriement of the lambda function (compared to the usual approach of creating a new series), but the following code:
+
+```{python}
+policies['risk_and_gender'] = policies['risk_type'] + " " + policies['gender']
+policies
+```
+
+requires the in-place replacement of the `policies` dataset and so will adjust the `policies` dataset that when created did not have the risk_and_gender field, which could cause some confusion when debugging.
+
+## **Groupby** variables and **Aggregate** your dataset 
+
+In order to summarise your data (and potentially after grouping by certain variables), this can all be chained together in one statement
+
+```{python}
+policies.aggregate(exposure = ('exposure', 'sum'), claim = ('claim', 'sum'))
+```
+
+Yes we could have done this easier using .sum() or .agg but I like to follow the principle of longer readable code preferred over shorter less human readable code
+
+```{python}
+policies.agg({'exposure': 'sum', 'claim':'sum'})  # returns a series, not a dataframe
+```
+
+```{python}
+policies.sum()  #this gives unexpected output
+```
+
+## Putting it togther by chaining
+
+The advantages of applying only these 5 verbs to remember in pandas to deal with 80% of your data manipulation problems means there is less to remember in learning pandas, there is predictable inputs and outputs (dataframes, not series sometimes), and you can chain commands so it is readable, and immutable tables will be clearer and reduce errors
+
+```{python}
+policies2 = policies[['risk_type', 'gender', 'exposure', 'claim']] \
+    .query('risk_type!="DI"') \
+    .sort_values(['risk_type', 'gender']) \
+    .assign(risk_and_gender=lambda d: d['risk_type'] + " " + d['gender']) \
+    .groupby('risk_and_gender') \
+    .aggregate(exposure = ('exposure', 'sum'), claim = ('claim', 'sum')) \
+    .assign(incidence = lambda d: d.claim / d.exposure) \
+    .reset_index(names='risk_and_gender')
+policies2
+```
+
+* multiple lines of code can be also created (instead of the escape \ operator) with overall parenthesese around multi-lines. This has the benefit of being able to input comments in between lines. The disadvantage is in practice I like highlighting subset blocks of lines (not necesessary all the lines) to run interactively at a time and this requires an extra closing brackets
+
+# Appendix 
+## Comparison syntax of 'tidy' pandas vs dplyr
+
+
+```{python}
+# 'traditional' way in python overwriting policies file
+# and then can't rerun after running once as we have overwritten policies 
+# original dataset
+
+policies = policies[['risk_type', 'gender', 'exposure', 'claim']] # need a copy
+
+policies = policies[policies['risk_type']!="DI"] # need to duplicate writing of policies
+
+policies['risk_and_gender'] = policies['risk_type'] + " " + policies['gender'] 
+# now policies2 dataset in line above changed
+
+policies.sort_values(['risk_type', 'gender'], inplace=True)
+# again inplace modification of policies dataset
+
+policies = policies.groupby('risk_and_gender').agg({'exposure': 'sum', 'claim':'sum'})
+
+policies['incidence'] = policies['claim'] / policies['exposure']
+policies
+```
+
+The problem with this method is that because we have modified the `policies` dataset in place, we cannot rerun the above block of code after rerunning once.
+This is overcome by treating datasets as "immutable" so that there's no confusion about the `policies` dataset, and reproducibility when re-running code is allowed.
+
+Summary comparison vs dplyr
+
+```{python}
+#| echo: false
+from tabulate import tabulate
+tabulate(policies)
+
+td = [
+    ["select dataframe", "df", "df"],
+    ["Subset columns", "df %>% \n  select(column1, column2)", "df[['column1', 'column2']]"],
+    ["Subset rows", "df %>% \n  filter(column1 == 'A')", "df.query('column1 == \"A\"')"],
+    ["Create new column", "df %>% \n  mutate(column2 = column1 + 1)", "df.assign(column1 = lambda d: d.column1 + 1)"],
+    ["Group by / aggregate", "df %>% \n  group_by(key) \n  summarise(col1sum = sum(column1))", "df.groupby('key') \\ \n  aggregate(col1sum=('column1', 'sum'))"],
+    ["Sort", "df %>% \n  arrange(column1)", "df.sort_values('column1')"],
+]
+hdr = ["Action", "R (dplyr)", "tidy Pandas Method"]
+# print(tabulate(td,headers=hdr, tablefmt="grid"))
+# copy and paste
+```
+
++----------------------+-------------------------------------+----------------------------------------------+
+| Action               | R (dplyr)                           | tidy Pandas Method                           |
++======================+=====================================+==============================================+
+| select dataframe     | df                                  | df                                           |
++----------------------+-------------------------------------+----------------------------------------------+
+| Subset columns       | df %>%                              | df[['column1', 'column2']]                   |
+|                      |   select(column1, column2)          |                                              |
++----------------------+-------------------------------------+----------------------------------------------+
+| Subset rows          | df %>%                              | df.query('column1 == "A"')                   |
+|                      |   filter(column1 == 'A')            |                                              |
++----------------------+-------------------------------------+----------------------------------------------+
+| Create new column    | df %>%                              | df.assign(column1 = lambda d: d.column1 + 1) |
+|                      |   mutate(column2 = column1 + 1)     |                                              |
++----------------------+-------------------------------------+----------------------------------------------+
+| Group by / aggregate | df %>%                              | df.groupby('key') \                          |
+|                      |   group_by(key)                     |   aggregate(col1sum=('column1', 'sum'))      |
+|                      |   summarise(col1sum = sum(column1)) |                                              |
++----------------------+-------------------------------------+----------------------------------------------+
+| Sort                 | df %>%                              | df.sort_values('column1')                    |
+|                      |   arrange(column1)                  |                                              |
++----------------------+-------------------------------------+----------------------------------------------+
